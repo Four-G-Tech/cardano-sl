@@ -42,7 +42,6 @@ instance FromJSON CTxId => FromJSONKey CTxId where
 instance ToJSON CTxId => ToJSONKey CTxId where
     toJSONKey = toJSONKeyText (\(CTxId (CHash t)) -> t)
 
-
 accountIdFromText :: Text -> Either Text AccountId
 accountIdFromText t = case T.splitOn "@" t of
     [walId, idx] -> AccountId (CId $ CHash walId) <$> readEither idx

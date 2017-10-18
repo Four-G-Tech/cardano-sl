@@ -4,24 +4,25 @@ module Pos.Aeson.Crypto
 
 import           Universum
 
-import           Crypto.Hash          (HashAlgorithm)
-import qualified Crypto.Sign.Ed25519  as Ed25519
-import           Data.Aeson           (FromJSON (..), FromJSONKey (..),
-                                       FromJSONKeyFunction (..), ToJSON (..),
-                                       ToJSONKey (..))
-import           Data.Aeson.TH        (defaultOptions, deriveJSON)
-import           Data.Aeson.Types     (toJSONKeyText)
-import           Formatting           (sformat)
-import           Serokell.Util.Base64 (JsonByteString (..))
+import qualified Cardano.Crypto.Wallet as CC
+import           Crypto.Hash           (HashAlgorithm)
+import qualified Crypto.Sign.Ed25519   as Ed25519
+import           Data.Aeson            (FromJSON (..), FromJSONKey (..),
+                                        FromJSONKeyFunction (..), ToJSON (..),
+                                        ToJSONKey (..))
+import           Data.Aeson.TH         (defaultOptions, deriveJSON)
+import           Data.Aeson.Types      (toJSONKeyText)
+import           Formatting            (sformat)
+import           Serokell.Util.Base64  (JsonByteString (..))
 
-import           Pos.Crypto           (AbstractHash, HDAddressPayload (..), ProxyCert,
-                                       ProxySecretKey, PublicKey, RedeemPublicKey,
-                                       RedeemSignature, Signature (..),
-                                       decodeAbstractHash, fullProxyCertHexF,
-                                       fullPublicKeyF, fullSignatureHexF, hashHexF,
-                                       hashHexF, parseFullProxyCert, parseFullPublicKey,
-                                       parseFullSignature)
-import           Pos.Util.Util        (eitherToFail, parseJSONWithRead)
+import           Pos.Crypto            (AbstractHash, HDAddressPayload (..), ProxyCert,
+                                        ProxySecretKey, PublicKey, RedeemPublicKey,
+                                        RedeemSignature, Signature (..),
+                                        decodeAbstractHash, fullProxyCertHexF,
+                                        fullPublicKeyF, fullSignatureHexF, hashHexF,
+                                        hashHexF, parseFullProxyCert, parseFullPublicKey,
+                                        parseFullSignature)
+import           Pos.Util.Util         (eitherToFail, parseJSONWithRead)
 
 instance ToJSON (AbstractHash algo a) where
     toJSON = toJSON . sformat hashHexF
@@ -75,6 +76,12 @@ instance FromJSON Ed25519.Signature where
 
 instance ToJSON Ed25519.Signature where
     toJSON = toJSON . JsonByteString . Ed25519.unSignature
+
+instance FromJSON CC.XSignature where
+    parseJSON v = either (error . toText) identity . CC.xsignature . getJsonByteString <$> parseJSON v
+
+instance ToJSON CC.XSignature where
+    toJSON = toJSON . JsonByteString . CC.unXSignature
 
 instance FromJSON HDAddressPayload where
     parseJSON v = HDAddressPayload . getJsonByteString <$> parseJSON v

@@ -7,7 +7,7 @@ module Pos.Aeson.Core
 import           Universum
 
 import           Data.Aeson             (FromJSON (..), FromJSONKey (..),
-                                         FromJSONKeyFunction (..), ToJSON (toJSON),
+                                         FromJSONKeyFunction (..), ToJSON (..),
                                          ToJSONKey (..), object, withObject, (.:), (.=))
 import           Data.Aeson.TH          (defaultOptions, deriveFromJSON, deriveJSON,
                                          deriveToJSON)
@@ -100,8 +100,6 @@ instance ToJSON Address where
 -- If datatype is used on frontend, please use this instead of
 -- any other way of deriving if possible.
 
-deriveJSON defaultOptions ''BlockCount
-
 instance FromJSON ApplicationName where
     -- mkApplicationName will fail if the parsed text isn't appropriate.
     --
@@ -111,10 +109,12 @@ instance FromJSON ApplicationName where
 
 deriveToJSON defaultOptions ''ApplicationName
 
+-- Instances needed for wallet
 deriveJSON defaultOptions ''ChainDifficulty
 deriveJSON defaultOptions ''SlotId
 deriveJSON defaultOptions ''LocalSlotIndex
 deriveJSON defaultOptions ''BlockVersion
+deriveJSON defaultOptions ''BlockCount
 
 instance FromJSON Coin where
     parseJSON v = mkCoin <$> parseJSON v
