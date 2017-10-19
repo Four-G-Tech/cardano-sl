@@ -13,21 +13,23 @@ module Pos.Wallet.Web.Pending.Submission
 
 import           Universum
 
-import           Control.Monad.Catch          (Handler (..), catches)
+import           Control.Monad.Catch          (Handler (..), catches, onException)
 import           Formatting                   (build, sformat, shown, stext, (%))
 import           System.Wlog                  (WithLogger, logDebug, logInfo, logWarning)
 
 import           Pos.Client.Txp.History       (saveTx)
 import           Pos.Communication            (EnqueueMsg, submitTxRaw)
 import           Pos.Configuration            (walletTxCreationDisabled)
+import           Pos.Util.Util                (maybeThrow)
 import           Pos.Wallet.Web.Error         (WalletError (..))
 import           Pos.Wallet.Web.Mode          (MonadWalletWebMode)
 import           Pos.Wallet.Web.Pending.Types (PendingTx (..), PtxCondition (..),
                                                PtxPoolInfo)
-import           Pos.Wallet.Web.Pending.Util  (isReclaimableFailure)
+import           Pos.Wallet.Web.Pending.Util  (isReclaimableFailure, ptxPoolInfo,
+                                               usingPtxCoords)
 import           Pos.Wallet.Web.State         (PtxMetaUpdate (PtxMarkAcknowledged),
                                                addOnlyNewPendingTx, casPtxCondition,
-                                               ptxUpdateMeta)
+                                               ptxUpdateMeta, removeOnlyCreatingPtx)
 
 -- | Handers used for to procees various pending transaction submission
 -- errors.
@@ -116,10 +118,15 @@ submitAndSavePtx PtxSubmissionHandlers{..} enqueue ptx@PendingTx{..} = do
     when walletTxCreationDisabled $
         throwM $ InternalError "Transaction creation is disabled by configuration!"
 
+    addOnlyNewPendingTx ptx
     ack <- submitTxRaw enqueue _ptxTxAux
     reportSubmitted ack
-    saveTx (_ptxTxId, _ptxTxAux) `catches` handlers ack
-    addOnlyNewPendingTx ptx
+    (saveTx (_ptxTxId, _ptxTxAux)
+        `catches` handlers ack)
+        `onException` creationFailedHandler
+
+    poolInfo <- badInitPtxCondition `maybeThrow` ptxPoolInfo _ptxCond
+    _ <- usingPtxCoords casPtxCondition ptx _ptxCond (PtxApplying poolInfo)
     when ack $ ptxUpdateMeta _ptxWallet _ptxTxId PtxMarkAcknowledged
   where
     handlers accepted =
@@ -133,14 +140,12 @@ submitAndSavePtx PtxSubmissionHandlers{..} enqueue ptx@PendingTx{..} = do
             -- but it's better to try with tx again than to regret, right?
             minorError "unknown error" e
         ]
-
     minorError desc e = do
         reportError desc e ", but was given another chance"
         pshOnMinor e
     nonReclaimableError accepted e = do
         reportError "fatal" e ""
         pshOnNonReclaimable accepted e
-
     reportError desc e outcome =
         logInfo $
         sformat ("Transaction #"%build%" application failed ("%shown%" - "
@@ -150,3 +155,10 @@ submitAndSavePtx PtxSubmissionHandlers{..} enqueue ptx@PendingTx{..} = do
         sformat ("submitAndSavePtx: transaction submitted with confirmation?: "
                 %build) ack
 
+    creationFailedHandler =
+        -- tx creation shouldn't fail if any of peers accepted our tx, but still,
+        -- if transaction was detected in blocks and its state got updated by tracker
+        -- while transaction creation failed, due to protocol error or bug,
+        -- then we better not remove this pending transaction
+        void $ usingPtxCoords removeOnlyCreatingPtx ptx
+    badInitPtxCondition = InternalError "Expected PtxCreating as initial pending condition"
