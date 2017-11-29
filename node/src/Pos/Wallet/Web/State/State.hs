@@ -11,6 +11,7 @@ module Pos.Wallet.Web.State.State
        , openMemState
        , closeState
 
+       , WalBalancesAndUtxo
        , AddressLookupMode (..)
        , CustomAddressType (..)
 
@@ -103,8 +104,8 @@ import           Pos.Wallet.Web.State.Acidic  (WalletState, closeState, openMemS
 import           Pos.Wallet.Web.State.Acidic  as A
 import           Pos.Wallet.Web.State.Storage (AddressLookupMode (..),
                                                CustomAddressType (..), PtxMetaUpdate (..),
-                                               WalletBalances, WalletStorage,
-                                               WalletTip (..))
+                                               WalBalancesAndUtxo, WalletBalances,
+                                               WalletStorage, WalletTip (..))
 
 -- | MonadWalletWebDB stands for monad which is able to get web wallet state
 type MonadWalletWebDB ctx m =
