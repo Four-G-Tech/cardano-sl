@@ -68,8 +68,8 @@ txOutStake TxOut {..} =
 
 -- | Convert 'TxPayload' into a flat list of `TxAux`s.
 flattenTxPayload :: TxPayload -> [TxAux]
-flattenTxPayload UnsafeTxPayload {..} =
-    zipWith TxAux (toList _txpTxs) _txpWitnesses
+flattenTxPayload payload =
+    zipWith TxAux (toList (_txpTxs payload)) (_txpWitnesses payload)
 
 emptyTxPayload :: TxPayload
 emptyTxPayload = mkTxPayload []
