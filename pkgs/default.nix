@@ -1579,7 +1579,7 @@ self: {
           description = "Cardano SL client modules";
           license = stdenv.lib.licenses.mit;
         }) {};
-      cardano-sl-core = callPackage ({ QuickCheck, aeson, ansi-terminal, autoexporter, base, base58-bytestring, binary, bytestring, canonical-json, cardano-sl-binary, cardano-sl-crypto, cardano-sl-networking, cardano-sl-util, cborg, containers, cpphs, cryptonite, cryptonite-openssl, data-default, deepseq, deriving-compat, digest, directory, exceptions, extra, filepath, fmt, formatting, generic-arbitrary, hashable, lens, log-warper, memory, mkDerivation, mtl, parsec, plutus-prototype, quickcheck-instances, random, reflection, scrypt, serokell-util, stdenv, tagged, template-haskell, text, text-format, th-lift-instances, time, time-units, universum, unordered-containers, vector }:
+      cardano-sl-core = callPackage ({ Cabal, QuickCheck, aeson, ansi-terminal, autoexporter, base, base58-bytestring, binary, bytestring, canonical-json, cardano-sl-binary, cardano-sl-crypto, cardano-sl-networking, cardano-sl-util, cborg, containers, cpphs, cryptonite, cryptonite-openssl, data-default, deepseq, deriving-compat, digest, directory, exceptions, extra, filepath, fmt, formatting, generic-arbitrary, hashable, lens, log-warper, memory, mkDerivation, mtl, parsec, plutus-prototype, quickcheck-instances, random, reflection, scrypt, serokell-util, stdenv, tagged, template-haskell, text, text-format, th-lift-instances, time, time-units, universum, unordered-containers, vector }:
       mkDerivation {
           pname = "cardano-sl-core";
           version = "1.0.3";
@@ -1592,6 +1592,7 @@ self: {
             base58-bytestring
             binary
             bytestring
+            Cabal
             canonical-json
             cardano-sl-binary
             cardano-sl-crypto
@@ -5363,6 +5364,8 @@ self: {
           pname = "megaparsec";
           version = "6.2.0";
           sha256 = "8feaed80faf349cf67f642683173385e97e46d254db4eeefb3724de6993bd6cf";
+          revision = "1";
+          editedCabalFile = "1avlmfwf822bn7y8pgdbf67jsq2sdppvsrvhxd5na5jxvfx2j0lz";
           libraryHaskellDepends = [
             base
             bytestring
