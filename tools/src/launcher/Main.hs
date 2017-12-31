@@ -100,6 +100,20 @@ type M a = (HasConfigurations, HasCompileInfo) => Log.LoggerNameBox IO a
 
 data Executable = EWallet | ENode | EUpdater
 
+-- Node, its args, node log
+data NodeData = NodeData
+    { _nodePath    :: FilePath
+    , _nodeArgs    :: [Text]
+    , _nodeLogPath :: Maybe FilePath }
+
+-- Updater Node, its args, node log, archive path
+data UpdaterData = UpdaterData
+    { _uNodePath          :: FilePath
+    , _uNodeArgs          :: [Text]
+    , _uNodeLogPath       :: Maybe FilePath
+    , _uUpdateArchivePath :: Maybe FilePath
+    }
+
 optionsParser :: Parser LauncherOptions
 optionsParser = do
     let textOption :: IsString a => Mod OptionFields String -> Parser a
@@ -281,11 +295,9 @@ main =
                 serverScenario
                     (NodeDbPath loNodeDbPath)
                     loNodeLogConfig
-                    (loNodePath, realNodeArgs, loNodeLogPath)
-                    ( loUpdaterPath
-                    , loUpdaterArgs
-                    , loUpdateWindowsRunner
-                    , loUpdateArchive)
+                    (NodeData loNodePath realNodeArgs loNodeLogPath)
+                    (UpdaterData
+                        loUpdaterPath loUpdaterArgs loUpdateWindowsRunner loUpdateArchive)
                     loReportServer
             Just wpath -> do
                 logNotice "LAUNCHER STARTED"
@@ -293,12 +305,10 @@ main =
                 clientScenario
                     (NodeDbPath loNodeDbPath)
                     loNodeLogConfig
-                    (loNodePath, realNodeArgs, loNodeLogPath)
-                    (wpath, loWalletArgs, loWalletLogPath)
-                    ( loUpdaterPath
-                    , loUpdaterArgs
-                    , loUpdateWindowsRunner
-                    , loUpdateArchive)
+                    (NodeData loNodePath realNodeArgs loNodeLogPath)
+                    (NodeData wpath loWalletArgs loWalletLogPath)
+                    (UpdaterData
+                        loUpdaterPath loUpdaterArgs loUpdateWindowsRunner loUpdateArchive)
                     loNodeTimeoutSec
                     loReportServer
                     loWalletLogging
@@ -340,8 +350,8 @@ main =
 serverScenario
     :: NodeDbPath
     -> Maybe FilePath                      -- ^ Logger config
-    -> (FilePath, [Text], Maybe FilePath)  -- ^ Node, its args, node log
-    -> (FilePath, [Text], Maybe FilePath, Maybe FilePath)
+    -> NodeData
+    -> UpdaterData
     -- ^ Updater, args, updater runner, the update .tar
     -> Maybe String                        -- ^ Report server
     -> M ()
@@ -367,10 +377,9 @@ serverScenario ndbp logConf node updater report = do
 clientScenario
     :: NodeDbPath
     -> Maybe FilePath                      -- ^ Logger config
-    -> (FilePath, [Text], Maybe FilePath)  -- ^ Node, its args, node log
-    -> (FilePath, [Text], Maybe FilePath)
-    -- ^ Wallet, args, wallet log path
-    -> (FilePath, [Text], Maybe FilePath, Maybe FilePath)
+    -> NodeData                            -- ^ Node, args, wallet log path
+    -> NodeData                            -- ^ Wallet, args, wallet log path
+    -> UpdaterData
     -- ^ Updater, args, updater runner, the update .tar
     -> Int                                 -- ^ Node timeout, in seconds
     -> Maybe String                        -- ^ Report server
@@ -378,9 +387,9 @@ clientScenario
     -> M ()
 clientScenario ndbp logConf node wallet updater nodeTimeout report walletLog = do
     runUpdater ndbp updater
-    let doesWalletLogToConsole = isNothing (wallet^._3) && walletLog
+    let doesWalletLogToConsole = isNothing (_nodeLogPath wallet) && walletLog
     (nodeHandle, nodeAsync) <- spawnNode node doesWalletLogToConsole
-    walletAsync <- async (runWallet walletLog wallet (node^._3))
+    walletAsync <- async (runWallet walletLog wallet (_nodeLogPath node))
     (someAsync, exitCode) <- waitAny [nodeAsync, walletAsync]
     let restart = clientScenario ndbp logConf node wallet updater nodeTimeout report walletLog
     if | someAsync == nodeAsync -> do
@@ -428,8 +437,8 @@ clientScenario ndbp logConf node wallet updater nodeTimeout report walletLog = d
 
 -- | We run the updater and delete the update file if the update was
 -- successful.
-runUpdater :: NodeDbPath -> (FilePath, [Text], Maybe FilePath, Maybe FilePath) -> M ()
-runUpdater ndbp (path, args, runnerPath, mUpdateArchivePath) = do
+runUpdater :: NodeDbPath -> UpdaterData -> M ()
+runUpdater ndbp (UpdaterData path args runnerPath mUpdateArchivePath) = do
     whenM (liftIO (doesFileExist path)) $ do
         logNotice "Running the updater"
         let args' = args ++ maybe [] (one . toText) mUpdateArchivePath
@@ -483,10 +492,10 @@ writeWindowsUpdaterRunner runnerPath = liftIO $ do
 ----------------------------------------------------------------------------
 
 spawnNode
-    :: (FilePath, [Text], Maybe FilePath)
+    :: NodeData
     -> Bool -- Wallet logging
     -> M (ProcessHandle, Async ExitCode)
-spawnNode (path, args, mbLogPath) doesWalletLogToConsole = do
+spawnNode (NodeData path args mbLogPath) doesWalletLogToConsole = do
     logNotice "Starting the node"
     -- We don't explicitly close the `logHandle` here,
     -- but this will be done when we run the `CreateProcess` built
@@ -517,10 +526,10 @@ spawnNode (path, args, mbLogPath) doesWalletLogToConsole = do
 
 runWallet
     :: Bool                               -- ^ wallet logging
-    -> (FilePath, [Text], Maybe FilePath) -- ^ Wallet, its args, wallet log file
+    -> NodeData                           -- ^ Wallet, its args, wallet log file
     -> Maybe FilePath                     -- ^ Node log file
     -> M ExitCode
-runWallet shouldLog (path, args, mLogPath) nLogPath = do
+runWallet shouldLog (NodeData path args mLogPath) nLogPath = do
     logNotice "Starting the wallet"
     phvar <- newEmptyMVar
     liftIO $ case mLogPath of
