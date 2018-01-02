@@ -81,42 +81,44 @@ module Pos.Wallet.Web.State.State
        , cancelApplyingPtxs
        , cancelSpecificApplyingPtx
        , reevaluateUncertainPtxs
+       , removeCanceledPtxs
        , getWalletStorage
        , flushWalletStorage
        ) where
 
-import           Control.Lens                 (ifor_)
-import           Data.Acid                    (EventResult, EventState, QueryEvent,
-                                               UpdateEvent)
-import qualified Data.Map                     as Map
-import qualified Data.HashMap.Strict          as HM
-import           Ether.Internal               (HasLens (..))
-import           Mockable                     (MonadMockable)
-import           System.Wlog (WithLogger)
+import           Control.Lens                     (ifor_)
+import           Data.Acid                        (EventResult, EventState, QueryEvent,
+                                                   UpdateEvent)
+import qualified Data.HashMap.Strict              as HM
+import qualified Data.Map                         as Map
+import           Ether.Internal                   (HasLens (..))
+import           Mockable                         (MonadMockable)
+import           System.Wlog                      (WithLogger)
 import           Universum
 
-import           Pos.Client.Txp.History       (TxHistoryEntry)
-import           Pos.Core.Configuration       (HasConfiguration)
-import           Pos.DB.Block                 (MonadBlockDB)
-import           Pos.Wallet.SscType           (WalletSscType)
-import           Pos.StateLock                (MonadStateLock)
-import           Pos.Txp                      (TxId, Utxo, UtxoModifier, MonadUtxoRead)
-import           Pos.Types                    (HeaderHash, SlotId)
-import           Pos.Util.Servant             (encodeCType)
-import           Pos.Wallet.Web.ClientTypes   (AccountId, Addr, CAccountMeta, CId,
-                                               CProfile, CTxId, CTxMeta, CUpdateInfo,
-                                               CWAddressMeta, CWalletMeta, PassPhraseLU,
-                                               Wal)
-import           Pos.Wallet.Web.Pending.Types (PendingTx (..), PtxCondition,
-                                               ptxWallet, ptxCond, ptxTxId)
+import           Pos.Client.Txp.History           (TxHistoryEntry)
+import           Pos.Core.Configuration           (HasConfiguration)
+import           Pos.DB.Block                     (MonadBlockDB)
+import           Pos.StateLock                    (MonadStateLock)
+import           Pos.Txp                          (MonadUtxoRead, TxId, Utxo,
+                                                   UtxoModifier)
+import           Pos.Types                        (HeaderHash, SlotId)
+import           Pos.Util.Servant                 (encodeCType)
+import           Pos.Wallet.SscType               (WalletSscType)
+import           Pos.Wallet.Web.ClientTypes       (AccountId, Addr, CAccountMeta, CId,
+                                                   CProfile, CTxId, CTxMeta, CUpdateInfo,
+                                                   CWAddressMeta, CWalletMeta,
+                                                   PassPhraseLU, Wal)
 import qualified Pos.Wallet.Web.Pending.Functions as F
-import           Pos.Wallet.Web.State.Acidic  (WalletState, closeState, openMemState,
-                                               openState)
-import           Pos.Wallet.Web.State.Acidic  as A
-import           Pos.Wallet.Web.State.Storage (AddressLookupMode (..),
-                                               CustomAddressType (..), PtxMetaUpdate (..),
-                                               WalletBalances, WalletStorage,
-                                               WalletTip (..))
+import           Pos.Wallet.Web.Pending.Types     (PendingTx (..), PtxCondition, ptxCond,
+                                                   ptxTxId, ptxWallet)
+import           Pos.Wallet.Web.State.Acidic      (WalletState, closeState, openMemState,
+                                                   openState)
+import           Pos.Wallet.Web.State.Acidic      as A
+import           Pos.Wallet.Web.State.Storage     (AddressLookupMode (..),
+                                                   CustomAddressType (..),
+                                                   PtxMetaUpdate (..), WalletBalances,
+                                                   WalletStorage, WalletTip (..))
 
 -- | MonadWalletWebDB stands for monad which is able to get web wallet state
 type MonadWalletWebDB ctx m =
@@ -350,6 +352,9 @@ cancelApplyingPtxs = updateDisk ... A.CancelApplyingPtxs
 
 cancelSpecificApplyingPtx :: WebWalletModeDB ctx m => TxId -> m ()
 cancelSpecificApplyingPtx txid = updateDisk ... A.CancelSpecificApplyingPtx txid
+
+removeCanceledPtxs :: WebWalletModeDB ctx m => m ()
+removeCanceledPtxs = updateDisk A.RemoveCanceledPtxs
 
 -- TODO: we might also want to give out a list of transactions that we've
 -- failed to update
