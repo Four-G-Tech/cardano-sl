@@ -77,6 +77,7 @@ module Pos.Wallet.Web.State.Storage
        , setPtxCondition
        , casPtxCondition
        , ptxUpdateMeta
+       , removePtx
        , removeCanceledPtxs
        , addOnlyNewPendingTx
        , resetFailedPtxs
@@ -510,6 +511,10 @@ cancelSpecificApplyingPtx :: TxId -> Update ()
 cancelSpecificApplyingPtx txId =
     wsWalletInfos . traversed .
     wsPendingTxs . ix txId %= cancelApplyingPtx
+
+removePtx :: TxId -> Update ()
+removePtx txId =
+    wsWalletInfos . traversed . wsPendingTxs . at txId .= Nothing
 
 removeCanceledPtxs :: Update ()
 removeCanceledPtxs =
